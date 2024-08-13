@@ -1,8 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 
-
-
 // Initialize express app
 const app = express();
 

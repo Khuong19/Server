@@ -2,32 +2,23 @@ const User = require('../models/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = 'secret_key';
+const JWT_SECRET = 'secret_key'; // It's recommended to move this to environment variables
 
 // Register a new user
 const register = async (req, res) => {
   try {
     const { email, password, username } = req.body;
-
-    // Basic validation for email, password, and username
     if (!email || !password || !username) {
       return res.status(400).json({ error: 'Email, password, and username are required' });
     }
-
-    // Check if a user with the given email already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
-
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create and save the new user
     const user = new User({ email, password: hashedPassword, username });
     await user.save();
 
-    // Send the user object (omit sensitive fields in production)
     res.status(201).json({
       message: 'User registered successfully',
       user: {
@@ -36,9 +27,7 @@ const register = async (req, res) => {
       },
     });
   } catch (err) {
-    // Log the error for server-side debugging
-    console.error('Registration error:', err.message || err);
-    // Send a generic error message
+    console.error(err);
     res.status(500).json({ error: 'Registration failed' });
   }
 };
@@ -47,39 +36,79 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   const { email, password } = req.body;
 
-  // Basic validation for email and password
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+      return res.status(400).json({ error: 'Email and password are required' });
   }
 
   try {
-    // Find user by email
-    const user = await User.findOne({ email });
-
-    // Check if user exists
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Compare provided password with stored hashed password
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    // If password matches, generate a JWT token
-    if (isMatch) {
-      const token = jwt.sign(
-        { userId: user._id, email: user.email },
-        JWT_SECRET
-      );
-      return res.json({ message: 'Login successful', token, userId: user._id });
-    }
-
-    // If password does not match
-    res.status(401).json({ error: 'Invalid credentials' });
+      const user = await User.findOne({ email });
+      if (!user) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (isMatch) {
+          const token = jwt.sign(
+              { userId: user._id.toString(), email: user.email }, // Ensure userId is included
+              JWT_SECRET
+          );
+          return res.json({ message: 'Login successful', token, userId: user._id });
+      }
+      res.status(401).json({ error: 'Invalid password' });
   } catch (err) {
-    // Log detailed error
-    console.error('Login error:', err.message || err);
-    // Send generic error message
-    res.status(500).json({ error: 'Login failed' });
+      console.error(err);
+      res.status(500).json({ error: 'Login failed' });
+  }
+};
+
+
+// Get the user profile
+const getMe = async (req, res) => {
+  try {
+    const userId = req.user.userId; 
+    const user = await User.findById(userId).select('-password'); 
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to get user' });
+  }
+};
+
+// Update user profile
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { email, username, password } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (email) {
+      user.email = email;
+    }
+    if (username) {
+      user.username = username;
+    }
+    if (password) {
+      user.password = await bcrypt.hash(password, 10);
+    }
+
+    await user.save();
+
+    res.json({
+      message: 'User profile updated successfully',
+      user: {
+        email: user.email,
+        username: user.username,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update user profile' });
   }
 };
 
@@ -93,20 +122,21 @@ const isAuthenticated = (req, res, next) => {
   const token = req.headers['authorization']?.split(' ')[1]; 
 
   if (token) {
-      jwt.verify(token, JWT_SECRET, (err, decoded) => {
-          if (err) {
-              return res.status(401).json({ error: 'Unauthorized' });
-          }
-          req.user = decoded; // Attach decoded token (user data) to request object
-          next();
-      });
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      req.user = { _id: decoded.userId, userId: decoded.userId };;
+      next();
+    });
   } else {
-      res.status(401).json({ error: 'No token provided' });
+    res.status(401).json({ error: 'No token provided' });
   }
 };
 
-
 module.exports = {
+  getMe,
+  updateProfile,
   register,
   login,
   logout,
