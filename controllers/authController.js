@@ -11,7 +11,7 @@ const register = async (req, res) => {
     if (!email || !password || !username) {
       return res.status(400).json({ error: 'Email, password, and username are required' });
     }
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email, username });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }

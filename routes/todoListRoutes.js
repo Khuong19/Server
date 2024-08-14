@@ -8,7 +8,8 @@ router.get('/search', authController.isAuthenticated, todoController.searchTasks
 
 router.route('/:userId')
     .get(authController.isAuthenticated, todoController.view_tasks_by_user_id)
-    .post(authController.isAuthenticated, todoController.create_new_task_for_user);
+    .post(authController.isAuthenticated, todoController.create_new_task_for_user)
+    .delete(authController.isAuthenticated, todoController.delete_all_task_by_status_for_user);
 
 router.route('/:userId/:taskId')
     .get(authController.isAuthenticated, todoController.view_task_by_id_for_user)

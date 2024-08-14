@@ -106,11 +106,24 @@ const delete_task_by_id_for_user = async (req, res) => {
     }
 };
 
+const delete_all_task_by_status_for_user = async (req,res) => {
+    try {
+        const { userId } = req.params;
+
+        const task = await TaskModel.deleteMany({ user: userId });
+
+        res.status(200).json({ message: 'Task deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete task', details: err.message });
+    }
+}
+
 module.exports = {
     view_tasks_by_user_id,
     view_task_by_id_for_user,
     create_new_task_for_user,
     update_task_by_id_for_user,
     searchTasks,
-    delete_task_by_id_for_user
+    delete_task_by_id_for_user,
+    delete_all_task_by_status_for_user
 };
